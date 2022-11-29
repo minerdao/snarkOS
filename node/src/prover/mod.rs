@@ -36,20 +36,23 @@ use snarkvm::prelude::{
     ViewKey,
 };
 
+use ansi_term::Colour::Cyan;
 use anyhow::Result;
 use colored::Colorize;
-use core::{marker::PhantomData, time::Duration};
+use core::marker::PhantomData;
 use parking_lot::RwLock;
 use rand::{rngs::OsRng, CryptoRng, Rng};
 use std::{
+    collections::VecDeque,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicU32, AtomicU8, Ordering},
         Arc,
     },
+    time::Duration,
 };
 use time::OffsetDateTime;
-use tokio::task::JoinHandle;
+use tokio::{task, task::JoinHandle};
 
 /// A prover is a full node, capable of producing proofs for consensus.
 #[derive(Clone)]
@@ -74,6 +77,7 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     shutdown: Arc<AtomicBool>,
     /// PhantomData.
     _phantom: PhantomData<C>,
+    total_proofs: Arc<AtomicU32>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
@@ -110,6 +114,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             handles: Default::default(),
             shutdown: Default::default(),
             _phantom: Default::default(),
+
+            total_proofs: Default::default(),
         };
         // Initialize the routing.
         node.initialize_routing().await;
@@ -117,6 +123,46 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         node.initialize_coinbase_puzzle().await;
         // Initialize the signal handler.
         node.handle_signals();
+
+        let prover = node.clone();
+        let total_proofs = prover.total_proofs;
+        task::spawn(async move {
+            fn calculate_proof_rate(now: u32, past: u32, interval: u32) -> Box<str> {
+                if interval < 1 {
+                    return Box::from("---");
+                }
+                if now <= past || past == 0 {
+                    return Box::from("---");
+                }
+                let rate = (now - past) as f64 / (interval * 60) as f64;
+                Box::from(format!("{:.2}", rate))
+            }
+            let mut log = VecDeque::<u32>::from(vec![0; 60]);
+            loop {
+                tokio::time::sleep(Duration::from_secs(60)).await;
+                let proofs = total_proofs.load(Ordering::SeqCst);
+                log.push_back(proofs);
+                let m1 = *log.get(59).unwrap_or(&0);
+                let m5 = *log.get(55).unwrap_or(&0);
+                let m15 = *log.get(45).unwrap_or(&0);
+                let m30 = *log.get(30).unwrap_or(&0);
+                let m60 = log.pop_front().unwrap_or_default();
+                info!(
+                    "{}",
+                    Cyan.normal().paint(format!(
+                        "Total solutions: {} (1m: {} c/s, 5m: {} c/s, 15m: {} c/s, 30m: {} c/s, 60m: {} c/s)",
+                        proofs,
+                        calculate_proof_rate(proofs, m1, 1),
+                        calculate_proof_rate(proofs, m5, 5),
+                        calculate_proof_rate(proofs, m15, 15),
+                        calculate_proof_rate(proofs, m30, 30),
+                        calculate_proof_rate(proofs, m60, 60),
+                    ))
+                );
+            }
+        });
+        debug!("Created proof rate calculator");
+
         // Return the node.
         Ok(node)
     }
@@ -234,7 +280,10 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 if let Ok(Some((solution_target, solution))) = result {
                     info!("Found a Solution '{}' (Proof Target {solution_target})", solution.commitment());
                     // Broadcast the prover solution.
+                    // prover.solutions_found.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                     self.broadcast_prover_solution(solution);
+                } else {
+                    self.total_proofs.fetch_add(1, Ordering::SeqCst);
                 }
             } else {
                 // Otherwise, sleep for a brief period of time, to await for puzzle state.
@@ -291,6 +340,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         });
         // Propagate the "UnconfirmedSolution" to the network.
         self.propagate(message, vec![]);
+        self.total_proofs.fetch_add(1, Ordering::SeqCst);
     }
 
     /// Returns the current number of puzzle instances.
