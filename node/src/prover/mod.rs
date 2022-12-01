@@ -298,14 +298,14 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Increment the puzzle instances.
         self.increment_puzzle_instances();
 
-        trace!(
-            "Proving 'CoinbasePuzzle' {}",
-            format!(
-                "(Epoch {}, Coinbase Target {coinbase_target}, Proof Target {proof_target})",
-                epoch_challenge.epoch_number(),
-            )
-            .dimmed()
-        );
+        // trace!(
+        //     "Proving 'CoinbasePuzzle' {}",
+        //     format!(
+        //         "(Epoch {}, Coinbase Target {coinbase_target}, Proof Target {proof_target})",
+        //         epoch_challenge.epoch_number(),
+        //     )
+        //     .dimmed()
+        // );
 
         // Compute the prover solution.
         let result = self
