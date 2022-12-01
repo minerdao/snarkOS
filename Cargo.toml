@@ -49,7 +49,7 @@ features = ["circuit",
   "cli",
   "parallel",
   "parameters",
-  "cuda"
+  # "cuda"
 ]
 
 [dependencies.anyhow]
