@@ -149,7 +149,7 @@ impl Handshake for TestPeer {
         //     panic!("didn't get challenge response")
         // };
 
-        assert_eq!(challenge_response.genesis_header, genesis_header);
+        // assert_eq!(challenge_response.genesis_header, genesis_header);
 
         Ok(conn)
     }
