@@ -155,7 +155,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 info!(
                     "{}",
                     Cyan.normal().paint(format!(
-                        "Total solutions: {} (1m: {} c/s, 5m: {} c/s, 15m: {} c/s, 30m: {} c/s, 60m: {} c/s)",
+                        "Total solutions: {} (1m: {} P/s, 5m: {} P/s, 15m: {} P/s, 30m: {} P/s, 60m: {} P/s)",
                         proofs,
                         calculate_proof_rate(proofs, m1, 1),
                         calculate_proof_rate(proofs, m5, 5),
