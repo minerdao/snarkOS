@@ -41,8 +41,8 @@ path = "snarkos/main.rs"
 git = "https://github.com/AleoHQ/snarkVM.git"
 # path = "../snarkvm"
 # rev = "7ac6eee"
-version = "0.9.9"
-# branch = "feat/snarkvm-cuda"
+# version = "0.9.9"
+branch = "feat/snarkvm-cuda"
 features = ["circuit",
   "console",
   "synthesizer",
